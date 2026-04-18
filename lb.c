@@ -297,12 +297,7 @@ int xdp_load_balancer(struct xdp_md *ctx) {
           return XDP_ABORTED;
         }
       }
-
-      backend = bpf_map_lookup_elem(&backends, &selected);
-      if (!backend) {
-        return XDP_ABORTED;
-      }
-      bpf_printk("Selected backend index: %d with IP: %pI4", selected, &backend->ip);
+      bpf_printk("Selected backend index: %d with IP: %pI4", selected, &backend->endpoint.ip);
 
       // Store the selected backend for this connection in the statetrack map
       if (bpf_map_update_elem(&statetrack, &five_tuple, &selected, BPF_ANY) != 0) {

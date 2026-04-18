@@ -106,3 +106,4 @@ func main() {
 	// Wait for SIGINT/SIGTERM (Ctrl+C) before exiting
 	<-ctx.Done()
 	log.Println("Received signal, exiting...")
+}
