@@ -268,16 +268,14 @@ int xdp_load_balancer(struct xdp_md *ctx) {
         return XDP_ABORTED;
       }
     } else {
-      // No existing connection found in statetrack map, new connection so select a backend
-
+      // No existing connection found in statetrack map
       // Select a backend using weighted round robin algorithm
-      __u32 selected = 0;
       __u32 zero = 0;
       __u32 *curr_idx = bpf_map_lookup_elem(&scheduler_state, &zero);
       if (!curr_idx) {
         return XDP_ABORTED;
       }
-      selected = *curr_idx;
+      __u32 selected = *curr_idx;
       backend = bpf_map_lookup_elem(&backends, &selected);
       if (!backend) {
         return XDP_ABORTED;
@@ -287,19 +285,20 @@ int xdp_load_balancer(struct xdp_md *ctx) {
       backend->used_count += 1;
 
       // Check whether used_count is equal to the backend's weight
-      // This means that this backend has handled the number of connections equal to its weight and we can move to the next backend for the future connections
+      // This means that this backend has handled the number of connections equal to its weight and 
+      // we can move to the next backend for the future connections
       if (backend->used_count >= backend->weight) { 
         backend->used_count = 0;                         // Set used_count to 0 when it completes its weight
         __u32 next_idx = (selected + 1) % NUM_BACKENDS;  // Increment the index to point to the next backend
          
-        // Update index in scheduler_state map
+        // Update index in scheduler_state map 
         if (bpf_map_update_elem(&scheduler_state, &zero, &next_idx, BPF_ANY) != 0) {
           return XDP_ABORTED;
         }
       }
       bpf_printk("Selected backend index: %d with IP: %pI4", selected, &backend->endpoint.ip);
 
-      // Store the selected backend for this connection in the statetrack map
+      // Update statetrack entry to track this new connection and its associated backend for future packets of the same connection
       if (bpf_map_update_elem(&statetrack, &five_tuple, &selected, BPF_ANY) != 0) {
         return XDP_ABORTED;
       }
@@ -319,8 +318,7 @@ int xdp_load_balancer(struct xdp_md *ctx) {
     }
 
     // Perform a FIB lookup
-    int rc = fib_lookup_v4_full(ctx, &fib, ip->daddr, backend->endpoint.ip,
-                                bpf_ntohs(ip->tot_len));
+    int rc = fib_lookup_v4_full(ctx, &fib, ip->daddr, backend->endpoint.ip, bpf_ntohs(ip->tot_len));
     if (rc != BPF_FIB_LKUP_RET_SUCCESS) {
       log_fib_error(rc);
       return XDP_ABORTED;
@@ -333,8 +331,7 @@ int xdp_load_balancer(struct xdp_md *ctx) {
     //bpf_printk("Packet from backend..");
 
     // Perform a FIB lookup - same as above
-    int rc = fib_lookup_v4_full(ctx, &fib, ip->daddr, out->ip,
-                                bpf_ntohs(ip->tot_len));
+    int rc = fib_lookup_v4_full(ctx, &fib, ip->daddr, out->ip, bpf_ntohs(ip->tot_len));
     if (rc != BPF_FIB_LKUP_RET_SUCCESS) {
       log_fib_error(rc);
       return XDP_ABORTED;
